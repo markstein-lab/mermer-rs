@@ -58,7 +58,7 @@ struct ParseBuffer {
 
 impl ParseBuffer {
     /// Return a new, empty ParseBuffer.
-    fn new() -> ParseBuffer {
+    fn new() -> Self {
         ParseBuffer {
             nibble : 0,
             nibble_size: 0,

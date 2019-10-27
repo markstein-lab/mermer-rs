@@ -224,6 +224,37 @@ fn read_fasta(f: &File) -> io::Result<(Vec<u8>, Vec<(u64, u32)>, Vec<Chromosome>
     Ok((genome, exceptions, chromosomes))
 }
 
+/// Return the reverse complement of a sequence motif.
+///
+/// # Arguments
+///
+/// - `motif` - The sequence motif to reverse.
+fn make_reverse_complement(motif: &str) -> String {
+    let mut chars: Vec<char> = Vec::with_capacity(motif.len());
+    for nucleotide in motif.chars() {
+        chars.push(match nucleotide {
+            'A' => 'T',
+            'B' => 'V',
+            'C' => 'G',
+            'D' => 'H',
+            'G' => 'C',
+            'H' => 'D',
+            'K' => 'M',
+            'M' => 'K',
+            'N' => 'N',
+            'R' => 'Y',
+            'S' => 'S',
+            'T' => 'A',
+            'U' => 'A',
+            'V' => 'B',
+            'W' => 'W',
+            'Y' => 'R',
+            _ => '\0',
+        })
+    }
+    chars.into_iter().collect()
+}
+
 fn main() {
     let f = File::open("/home/jakob/University/BIOL 296/dm6/dm6.fa").unwrap();
     let (genome, exceptions, chromosomes) = read_fasta(&f).unwrap();

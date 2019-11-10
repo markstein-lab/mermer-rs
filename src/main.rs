@@ -255,6 +255,61 @@ fn make_reverse_complement(motif: &str) -> String {
     reverse
 }
 
+fn make_tables(motifs: &Vec<String>) -> Vec<String> {
+    // unit = 1
+    // wordWidth = 32
+    // scanWidth = 4
+    // statesPerWord = wordWidth / scanWidth = 8
+
+    // extendedMotifLength = length of longest motif + scanWidth - 1
+    //                     = length of longest motif + 3
+    // numberOfTables = (extendedMotifLength + scanWidth - 1) / scanWidth
+    //                = (extendedMotifLength + 3) / 4
+    // paddedLength = (numberOfTables + 1) * scanWidth
+    //              = (numberOfTables + 1) * 4
+
+    let mut padded_motifs: Vec<String> = Vec::new();
+
+    let max_length = motifs
+        .iter()
+        .map(|motif| motif.len())
+        .max()
+        .unwrap();
+    let extended_motif_length = max_length + 3;
+    let number_of_tables = (extended_motif_length + 3) / 4;
+    let padded_length = (number_of_tables + 1) * 4;
+
+    for motif in motifs.iter() {
+        let mut base = "N".repeat(3); // scanWidth - 1
+        base.push_str(motif);
+        base.push_str(&"N".repeat(padded_length - base.len()));
+        padded_motifs.push(base)
+    }
+
+    // makeTables also creates `matches`. I am unsure of the purpose.
+
+    // Peter's comments are as follows:
+    //
+    // "There should be some heuristic code to arrange the motifs in an
+    // advantageous order, so that motifs of nearly the same length share a
+    // table, and that motifs whose leading characters are similar share a
+    // table. We leave this out for now, in the interests of getting a minimal
+    // program to work"
+
+    for i in 0..motifs.len() {
+        let j = i % 8; // i % statesPerWord
+        let mask = 1 << (j * 4); // (unit<<(j * scanWidth))
+                    // numberOfTables*scanWidth
+        for k in 0..number_of_tables * 4 {
+            let temporary_mask = mask << (k % 4); // mask << (k % scanWidth)
+            let table_index = k / 4; // k / scanWidth
+            // recursiveEnter(lookupString, tableIndex, tempMask, matches);
+        }
+    }
+
+    padded_motifs
+}
+
 fn main() {
     let f = File::open("/home/jakob/University/BIOL 296/dm6/dm6.fa").unwrap();
     let (genome, exceptions, chromosomes) = read_fasta(&f).unwrap();

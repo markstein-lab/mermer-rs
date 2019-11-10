@@ -230,9 +230,9 @@ fn read_fasta(f: &File) -> io::Result<(Vec<u8>, Vec<(u64, u32)>, Vec<Chromosome>
 ///
 /// - `motif` - The sequence motif to reverse.
 fn make_reverse_complement(motif: &str) -> String {
-    let mut chars: Vec<char> = Vec::with_capacity(motif.len());
+    let mut reverse = String::with_capacity(motif.len());
     for nucleotide in motif.chars() {
-        chars.push(match nucleotide {
+        reverse.push(match nucleotide {
             'A' => 'T',
             'B' => 'V',
             'C' => 'G',
@@ -252,7 +252,7 @@ fn make_reverse_complement(motif: &str) -> String {
             _ => '\0',
         })
     }
-    chars.into_iter().collect()
+    reverse
 }
 
 fn main() {

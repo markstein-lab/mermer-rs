@@ -255,7 +255,136 @@ fn make_reverse_complement(motif: &str) -> String {
     reverse
 }
 
-fn make_tables(motifs: &Vec<String>) -> Vec<String> {
+/// Return a string with a single character subtituted for another.
+///
+/// # Arguments
+///
+/// - `s` - the string to use as a base.
+/// - `offset` - the index of the character in `s` to substitute.
+/// - `substitution` - the character to substitute into `s`.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!("CAAA", substitute_char("AAAA", 0, 'C'));
+/// assert_eq!("AACA", substitute_char("AAAA", 2, 'C'));
+/// ```
+fn substitute_char(s: &str, offset: usize, substitution: char) -> String {
+    let mut res = String::with_capacity(s.len());
+    res.push_str(&s[0..offset]);
+    res.push(substitution);
+    res.push_str(&s[offset+1..]);
+    res
+}
+
+// u64 matches
+// #define matchTable(i, j) matches[i*(1<<(2*scanWidth)) + j]
+fn recursive_enter(table: &mut [u64], input: &str, mask: u64) {
+    let (non_mask_char_count, _) = input.chars().filter(|c| *c != 'N').size_hint();
+    // Handle the special case of every location being masked.
+    if non_mask_char_count == 0 {
+        for i in 0..256 { // 1<<(2*scanWidth)
+            table[i] |= mask;
+        }
+        return;
+    }
+
+    for (i, c) in input.chars().enumerate() {
+        match c {
+            'B' => {
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'D' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'H' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'K' => {
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'M' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                return;
+            }
+            'N' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'R' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                return;
+            }
+            'S' => {
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                return;
+            }
+            'U' => {
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'V' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'G'), mask);
+                return;
+            }
+            'W' => {
+                recursive_enter(table, &substitute_char(input, i, 'A'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            'Y' => {
+                recursive_enter(table, &substitute_char(input, i, 'C'), mask);
+                recursive_enter(table, &substitute_char(input, i, 'T'), mask);
+                return;
+            }
+            _ => {
+            }
+        }
+    }
+
+    // If we've reached this point, `input` contains only A, C, G, or T, and we
+    // can convert it to a binary number.
+    let mut index = 0;
+    for c in input.chars() {
+        index <<= 2;
+        match c {
+            'C' => {
+                index += 1;
+            }
+            'G' => {
+                index += 2;
+            }
+            'T' => {
+                index += 3;
+            }
+            _ => {}
+        }
+    }
+
+    // And now, the mask can be OR'd into the table.
+    table[index] |= mask;
+}
+
+fn make_tables(motifs: &Vec<String>) -> Vec<[u64; 256]> {
     // unit = 1
     // wordWidth = 32
     // scanWidth = 4
@@ -278,6 +407,11 @@ fn make_tables(motifs: &Vec<String>) -> Vec<String> {
     let extended_motif_length = max_length + 3;
     let number_of_tables = (extended_motif_length + 3) / 4;
     let padded_length = (number_of_tables + 1) * 4;
+
+    let mut tables: Vec<[u64; 256]> = Vec::with_capacity(number_of_tables);
+    for _ in 0..number_of_tables {
+        tables.push([0; 256]);
+    }
 
     for motif in motifs.iter() {
         let mut base = "N".repeat(3); // scanWidth - 1
@@ -303,11 +437,11 @@ fn make_tables(motifs: &Vec<String>) -> Vec<String> {
         for k in 0..number_of_tables * 4 {
             let temporary_mask = mask << (k % 4); // mask << (k % scanWidth)
             let table_index = k / 4; // k / scanWidth
-            // recursiveEnter(lookupString, tableIndex, tempMask, matches);
+            recursive_enter(&mut tables[table_index], &padded_motifs[i], temporary_mask);
         }
     }
 
-    padded_motifs
+    tables
 }
 
 fn main() {

@@ -470,3 +470,14 @@ fn main() {
         writeln!(file, "{} {:08x}", position, word);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_substitute_char() {
+        assert_eq!("CAAA", substitute_char("AAAA", 0, 'C'));
+        assert_eq!("AACA", substitute_char("AAAA", 2, 'C'));
+    }
+}

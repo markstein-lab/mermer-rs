@@ -36,6 +36,15 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::fs::File;
 
+/// The size of the sliding window and corresponding "turbo factor", denoting
+/// the number of nucleotides that constitute a "genome chunk".
+type ScanWord = u32;
+const SCAN_WIDTH: usize = std::mem::size_of::<ScanWord>();
+const WORD_WIDTH: usize = 2 << SCAN_WIDTH;
+
+/// The size of a "Match Mask Array" table.
+const TABLE_SIZE: usize = (1 << (2 * SCAN_WIDTH));
+
 /// A distinct chromosome in the genome.
 #[derive(Debug)]
 struct Chromosome {
@@ -277,13 +286,18 @@ fn substitute_char(s: &str, offset: usize, substitution: char) -> String {
     res
 }
 
-// u64 matches
-// #define matchTable(i, j) matches[i*(1<<(2*scanWidth)) + j]
-fn recursive_enter(table: &mut [u64], input: &str, mask: u64) {
+/// Insert a motif into a table.
+///
+/// # Arguments
+///
+/// - `table` - a mutable reference to the destination table.
+/// - `input` - the motif to enter into the table.
+/// - `mask` - the value to mask table entries with.
+fn recursive_enter(table: &mut [u64; TABLE_SIZE], input: &str, mask: u64) {
     let (non_mask_char_count, _) = input.chars().filter(|c| *c != 'N').size_hint();
     // Handle the special case of every location being masked.
     if non_mask_char_count == 0 {
-        for i in 0..256 { // 1<<(2*scanWidth)
+        for i in 0..TABLE_SIZE {
             table[i] |= mask;
         }
         return;
@@ -384,19 +398,12 @@ fn recursive_enter(table: &mut [u64], input: &str, mask: u64) {
     table[index] |= mask;
 }
 
-fn make_tables(motifs: &Vec<String>) -> Vec<[u64; 256]> {
-    // unit = 1
-    // wordWidth = 32
-    // scanWidth = 4
-    // statesPerWord = wordWidth / scanWidth = 8
-
-    // extendedMotifLength = length of longest motif + scanWidth - 1
-    //                     = length of longest motif + 3
-    // numberOfTables = (extendedMotifLength + scanWidth - 1) / scanWidth
-    //                = (extendedMotifLength + 3) / 4
-    // paddedLength = (numberOfTables + 1) * scanWidth
-    //              = (numberOfTables + 1) * 4
-
+/// Return the "Match Mask Array" for a search.
+///
+/// # Arguments
+///
+/// - `motifs` - the motifs being searched for.
+fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
     let mut padded_motifs: Vec<String> = Vec::new();
 
     let max_length = motifs
@@ -404,17 +411,12 @@ fn make_tables(motifs: &Vec<String>) -> Vec<[u64; 256]> {
         .map(|motif| motif.len())
         .max()
         .unwrap();
-    let extended_motif_length = max_length + 3;
-    let number_of_tables = (extended_motif_length + 3) / 4;
-    let padded_length = (number_of_tables + 1) * 4;
-
-    let mut tables: Vec<[u64; 256]> = Vec::with_capacity(number_of_tables);
-    for _ in 0..number_of_tables {
-        tables.push([0; 256]);
-    }
+    let extended_motif_length = max_length + (SCAN_WIDTH - 1);
+    let number_of_tables = (extended_motif_length + (SCAN_WIDTH - 1)) / SCAN_WIDTH;
+    let padded_length = (number_of_tables + 1) * SCAN_WIDTH;
 
     for motif in motifs.iter() {
-        let mut base = "N".repeat(3); // scanWidth - 1
+        let mut base = "N".repeat(SCAN_WIDTH - 1);
         base.push_str(motif);
         base.push_str(&"N".repeat(padded_length - base.len()));
         padded_motifs.push(base)
@@ -422,22 +424,31 @@ fn make_tables(motifs: &Vec<String>) -> Vec<[u64; 256]> {
 
     // makeTables also creates `matches`. I am unsure of the purpose.
 
-    // Peter's comments are as follows:
+    let mut tables = Vec::<[ScanWord; TABLE_SIZE]>::with_capacity(number_of_tables);
+    for _ in 0..number_of_tables {
+        tables.push([0; TABLE_SIZE]);
+    }
+
+    // Peter left the following comment:
     //
     // "There should be some heuristic code to arrange the motifs in an
     // advantageous order, so that motifs of nearly the same length share a
     // table, and that motifs whose leading characters are similar share a
     // table. We leave this out for now, in the interests of getting a minimal
     // program to work"
+    //
+    // This is worth marking as a TODO, but can probably be put off until we
+    // have a working reimplementation.
 
+    let states_per_word = WORD_WIDTH / SCAN_WIDTH;
     for i in 0..motifs.len() {
-        let j = i % 8; // i % statesPerWord
-        let mask = 1 << (j * 4); // (unit<<(j * scanWidth))
-                    // numberOfTables*scanWidth
-        for k in 0..number_of_tables * 4 {
-            let temporary_mask = mask << (k % 4); // mask << (k % scanWidth)
-            let table_index = k / 4; // k / scanWidth
-            recursive_enter(&mut tables[table_index], &padded_motifs[i], temporary_mask);
+        let j = i % states_per_word;
+        let mask = 1 << (j * SCAN_WIDTH);
+        for k in 0..number_of_tables * SCAN_WIDTH {
+            let temporary_mask = mask << (k % SCAN_WIDTH);
+            let table_index = k / SCAN_WIDTH;
+            let lookup_string = &padded_motifs[i][k..SCAN_WIDTH];
+            recursive_enter(&mut tables[table_index], lookup_string, temporary_mask);
         }
     }
 

@@ -455,6 +455,55 @@ fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
     tables
 }
 
+fn ivdeep(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) {
+    let level = 0;
+    let masks: [ScanWord; 4];
+
+    let mut i = start;
+
+    loop {
+        let index = genome[i] as usize;
+        match level {
+            0 => {
+                masks[0] = tables[0][index];
+            }
+            1 => {
+                masks[1] = masks[0] & tables[1][index];
+                masks[0] = tables[0][index];
+            }
+            2 => {
+                masks[2] = masks[1] & tables[2][index];
+                masks[1] = masks[0] & tables[1][index];
+                masks[0] = tables[0][index];
+            }
+            3 => {
+                masks[3] = masks[2] & tables[3][index];
+                masks[2] = masks[1] & tables[2][index];
+                masks[1] = masks[0] & tables[1][index];
+                masks[0] = tables[0][index];
+
+                if masks[3] != 0 {
+                    // identifyMatches
+                }
+            }
+        }
+        i += 1;
+        if (i > stop) {
+            break;
+        }
+        if masks[level] == 0 {
+            level -= 1;
+        } else {
+            level += 1;
+        }
+    }
+}
+
+// TODO: Give a better name than the original function.
+fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>) {
+    tables.len(); // size associated with {roman numberal}deep.
+}
+
 fn main() {
     let f = File::open("/home/jakob/University/BIOL 296/dm6/dm6.fa").unwrap();
     let (genome, exceptions, chromosomes) = read_fasta(&f).unwrap();

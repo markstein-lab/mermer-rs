@@ -455,6 +455,33 @@ fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
     tables
 }
 
+/// Return whether or not a nucleotide is an instance of a IUPAC character.
+///
+/// # Arguments
+///
+/// - `x` - the IPUAC charcter.
+/// - `y` - the nucleotide.
+fn is_symbol(x: char, y: char) -> bool {
+    match x {
+        'A' => y == 'A',
+        'B' => y != 'A',
+        'C' => y == 'C',
+        'D' => y != 'C',
+        'G' => y == 'G',
+        'H' => y != 'G',
+        'K' => y == 'G' || y == 'T',
+        'M' => y == 'A' || y == 'C',
+        'N' => true,
+        'R' => y == 'A' || y == 'G',
+        'S' => y == 'C' || y == 'G',
+        'T' | 'U' => y == 'T',
+        'V' => y != 'T',
+        'W' => y == 'A' || y == 'T',
+        'Y' => y == 'C' || y == 'T',
+        _ => false,
+    }
+}
+
 fn ivdeep(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) {
     let level = 0;
     let masks: [ScanWord; 4];

@@ -482,53 +482,72 @@ fn is_symbol(x: char, y: char) -> bool {
     }
 }
 
-fn ivdeep(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) {
-    let level = 0;
-    let masks: [ScanWord; 4];
+fn identify_matches(mask: ScanWord, index: usize, level: usize) {
+    let states_per_word = WORD_WIDTH / SCAN_WIDTH;
+    let maximum_index = states_per_word; // (numberOfMotifs < statesPerWord) ? numberOfMotifs : statesPerWord;
 
-    let mut i = start;
-
-    loop {
-        let index = genome[i] as usize;
-        match level {
-            0 => {
-                masks[0] = tables[0][index];
-            }
-            1 => {
-                masks[1] = masks[0] & tables[1][index];
-                masks[0] = tables[0][index];
-            }
-            2 => {
-                masks[2] = masks[1] & tables[2][index];
-                masks[1] = masks[0] & tables[1][index];
-                masks[0] = tables[0][index];
-            }
-            3 => {
-                masks[3] = masks[2] & tables[3][index];
-                masks[2] = masks[1] & tables[2][index];
-                masks[1] = masks[0] & tables[1][index];
-                masks[0] = tables[0][index];
-
-                if masks[3] != 0 {
-                    // identifyMatches
+    for i in 0..maximum_index {
+        // Extract a test bit.
+        if mask & ((1 << SCAN_WIDTH) - 1) != 0 {
+            let bit = 1 << (SCAN_WIDTH - 1);
+            for j in 0..SCAN_WIDTH {
+                // A bit was found corresponding to the match.
+                if mask & bit != 0 {
+                    let position = (index - level + 1) * SCAN_WIDTH + j;
+                    // FIXME: maximum_index needs to be replaced with number_of_motifs
+                    for k in ((i..maximum_index).step_by(states_per_word)) {
+                        // We're actually messing with the list of motifs now...
+                    }
                 }
             }
-        }
-        i += 1;
-        if (i > stop) {
-            break;
-        }
-        if masks[level] == 0 {
-            level -= 1;
-        } else {
-            level += 1;
         }
     }
 }
 
 // TODO: Give a better name than the original function.
-fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>) {
-    tables.len(); // size associated with {roman numberal}deep.
+fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) -> Vec<(ScanWord, usize)> {
+    let depth = 0;
+    let masks: Vec<ScanWord> = vec![0; tables.len()];
+    let matches = Vec::<(ScanWord, usize)>::new();
+
+    let mut i = start;
+
+    loop {
+        let index = genome[i] as usize;
+        for j in (0..=depth).rev() {
+            if j == 0 {
+                masks[j] = tables[j][index]
+            } else {
+                masks[j] = masks[j - 1] & tables[j][index];
+            }
+        }
+
+        // Either a match has been found, or we're going deeper.
+        if masks[depth] != 0 {
+            // We've found a match!
+            if depth == tables.len() - 1 {
+                matches.push((masks[depth], i));
+                if depth >= 4 {
+                    // Careful... this is a do-while.
+                    while {
+                        depth -= 1;
+                        depth > 0 && masks[depth - 1] == 0
+                    } {};
+                } else {
+                    depth += 1;
+                }
+            }
+        } else if depth < 4 {
+            depth += 1;
+        }
+
+        i += 1;
+        if i > stop {
+            break;
+        }
+    }
+
+    matches
 }
 
 fn main() {

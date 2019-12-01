@@ -482,33 +482,57 @@ fn is_symbol(x: char, y: char) -> bool {
     }
 }
 
-fn identify_matches(mask: ScanWord, index: usize, level: usize) {
+fn dna_char(genome: Vec<u8>, position: usize) -> char {
+    let byte = genome[position / SCAN_WIDTH];
+    let index = byte >> (2 * (SCAN_WIDTH - 1 - (position % SCAN_WIDTH))) & 3;
+    ['A', 'C', 'G', 'T'][index as usize]
+}
+
+fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: Vec<u8>, motifs: &Vec<String>) {
     let states_per_word = WORD_WIDTH / SCAN_WIDTH;
-    let maximum_index = states_per_word; // (numberOfMotifs < statesPerWord) ? numberOfMotifs : statesPerWord;
+    let matches = Vec::<(String, usize)>::new();
+    let maximum_index = if motifs.len() < states_per_word {
+        motifs.len()
+    } else {
+        states_per_word
+    };
+
+    let mut extract = (1 << SCAN_WIDTH) - 1;
+    let mut test_bit = 1 << (SCAN_WIDTH - 1);
 
     for i in 0..maximum_index {
         // Extract a test bit.
-        if mask & ((1 << SCAN_WIDTH) - 1) != 0 {
-            let bit = 1 << (SCAN_WIDTH - 1);
+        if mask & extract != 0 {
+            let mut bit = test_bit;
             for j in 0..SCAN_WIDTH {
                 // A bit was found corresponding to the match.
                 if mask & bit != 0 {
-                    let position = (index - level + 1) * SCAN_WIDTH + j;
-                    // FIXME: maximum_index needs to be replaced with number_of_motifs
-                    for k in ((i..maximum_index).step_by(states_per_word)) {
-                        // We're actually messing with the list of motifs now...
+                    let position = (index - depth + 1) * SCAN_WIDTH + j;
+                    for k in (i..motifs.len()).step_by(states_per_word) {
+                        let is_match = motifs[k].chars()
+                            .enumerate()
+                            .all(|(m, nucleotide)| {
+                                is_symbol(nucleotide, dna_char(genome, position + m))
+                            });
+                        if is_match {
+                            // TODO: Check for "invalid characters".
+                            matches.push((motifs[k].clone(), position));
+                        }
                     }
                 }
+                bit >>= 1;
             }
         }
+        extract <<= SCAN_WIDTH;
+        test_bit <<= SCAN_WIDTH;
     }
 }
 
 // TODO: Give a better name than the original function.
-fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) -> Vec<(ScanWord, usize)> {
+fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) -> Vec<(ScanWord, usize, usize)> {
     let depth = 0;
     let masks: Vec<ScanWord> = vec![0; tables.len()];
-    let matches = Vec::<(ScanWord, usize)>::new();
+    let matches = Vec::<(ScanWord, usize, usize)>::new();
 
     let mut i = start;
 
@@ -526,7 +550,7 @@ fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: us
         if masks[depth] != 0 {
             // We've found a match!
             if depth == tables.len() - 1 {
-                matches.push((masks[depth], i));
+                matches.push((masks[depth], i, depth));
                 if depth >= 4 {
                     // Careful... this is a do-while.
                     while {

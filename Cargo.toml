@@ -1,5 +1,9 @@
 [package]
 name = "mermer-rs"
+description = "Implementation of the Stack-AND exact string matching algorithm."
+repository = "https://github.com/Markstein-Lab/mermer-rs"
+keywords = ["bioinformatics"]
+license = "GPL-3.0-or-later"
 version = "0.1.0"
 authors = ["Jakob L. Kreuze <zerodaysfordays@sdf.lonestar.org>"]
 edition = "2018"

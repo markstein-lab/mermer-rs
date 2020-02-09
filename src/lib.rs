@@ -30,7 +30,6 @@
 // data that would be contained in genome.txt, exceptions.txt, and xcontigs.txt
 // are all returned as their respective in-memory structures.
 
-use std::error::Error;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -47,7 +46,7 @@ const TABLE_SIZE: usize = (1 << (2 * SCAN_WIDTH));
 
 /// A distinct chromosome in the genome.
 #[derive(Debug)]
-struct Chromosome {
+pub struct Chromosome {
     name: String,
     position: u64,
     size: u64,
@@ -164,7 +163,7 @@ impl ParseBuffer {
 ///     println!("{} has {} nucleotides", chromosome.name, chromosome.size);
 /// }
 /// ```
-fn read_fasta(f: &File) -> io::Result<(Vec<u8>, Vec<(u64, u32)>, Vec<Chromosome>)> {
+pub fn read_fasta(f: &File) -> io::Result<(Vec<u8>, Vec<(u64, u32)>, Vec<Chromosome>)> {
     let mut genome: Vec<u8> = Vec::new();
     let mut exceptions: Vec<(u64, u32)> = Vec::new(); // location, exception
     let mut chromosomes: Vec<Chromosome> = Vec::new();
@@ -293,7 +292,7 @@ fn substitute_char(s: &str, offset: usize, substitution: char) -> String {
 /// - `table` - a mutable reference to the destination table.
 /// - `input` - the motif to enter into the table.
 /// - `mask` - the value to mask table entries with.
-fn recursive_enter(table: &mut [u64; TABLE_SIZE], input: &str, mask: u64) {
+fn recursive_enter(table: &mut [ScanWord; TABLE_SIZE], input: &str, mask: ScanWord) {
     let (non_mask_char_count, _) = input.chars().filter(|c| *c != 'N').size_hint();
     // Handle the special case of every location being masked.
     if non_mask_char_count == 0 {
@@ -403,7 +402,7 @@ fn recursive_enter(table: &mut [u64; TABLE_SIZE], input: &str, mask: u64) {
 /// # Arguments
 ///
 /// - `motifs` - the motifs being searched for.
-fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
+pub fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
     let mut padded_motifs: Vec<String> = Vec::new();
 
     let max_length = motifs
@@ -447,7 +446,7 @@ fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
         for k in 0..number_of_tables * SCAN_WIDTH {
             let temporary_mask = mask << (k % SCAN_WIDTH);
             let table_index = k / SCAN_WIDTH;
-            let lookup_string = &padded_motifs[i][k..SCAN_WIDTH];
+            let lookup_string = &padded_motifs[i][k..k + SCAN_WIDTH];
             recursive_enter(&mut tables[table_index], lookup_string, temporary_mask);
         }
     }
@@ -482,15 +481,15 @@ fn is_symbol(x: char, y: char) -> bool {
     }
 }
 
-fn dna_char(genome: Vec<u8>, position: usize) -> char {
+fn dna_char(genome: &Vec<u8>, position: usize) -> char {
     let byte = genome[position / SCAN_WIDTH];
     let index = byte >> (2 * (SCAN_WIDTH - 1 - (position % SCAN_WIDTH))) & 3;
     ['A', 'C', 'G', 'T'][index as usize]
 }
 
-fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: Vec<u8>, motifs: &Vec<String>) {
+pub fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: &Vec<u8>, motifs: &Vec<String>) -> Vec::<(String, usize)> {
+    let mut matches = Vec::<(String, usize)>::new();
     let states_per_word = WORD_WIDTH / SCAN_WIDTH;
-    let matches = Vec::<(String, usize)>::new();
     let maximum_index = if motifs.len() < states_per_word {
         motifs.len()
     } else {
@@ -512,7 +511,7 @@ fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: Vec<u8>,
                         let is_match = motifs[k].chars()
                             .enumerate()
                             .all(|(m, nucleotide)| {
-                                is_symbol(nucleotide, dna_char(genome, position + m))
+                                is_symbol(nucleotide, dna_char(&genome, position + m))
                             });
                         if is_match {
                             // TODO: Check for "invalid characters".
@@ -526,17 +525,17 @@ fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: Vec<u8>,
         extract <<= SCAN_WIDTH;
         test_bit <<= SCAN_WIDTH;
     }
+    matches
 }
 
 // TODO: Give a better name than the original function.
-fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: usize, stop: usize) -> Vec<(ScanWord, usize, usize)> {
-    let depth = 0;
-    let masks: Vec<ScanWord> = vec![0; tables.len()];
-    let matches = Vec::<(ScanWord, usize, usize)>::new();
-
+pub fn do_the_search(tables: &Vec<[ScanWord; TABLE_SIZE]>, genome: &Vec<u8>, start: usize, stop: usize) -> Vec<(ScanWord, usize, usize)> {
+    let mut depth = 0;
     let mut i = start;
+    let mut masks: Vec<ScanWord> = vec![0; tables.len()];
+    let mut matches = Vec::<(ScanWord, usize, usize)>::new();
 
-    loop {
+    while i <= stop {
         let index = genome[i] as usize;
         for j in (0..=depth).rev() {
             if j == 0 {
@@ -549,7 +548,9 @@ fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: us
         // Either a match has been found, or we're going deeper.
         if masks[depth] != 0 {
             // We've found a match!
-            if depth == tables.len() - 1 {
+            if depth < 4 {
+                matches.push((masks[depth], i, depth));
+            } else if depth == tables.len() - 1 {
                 matches.push((masks[depth], i, depth));
                 if depth >= 4 {
                     // Careful... this is a do-while.
@@ -566,39 +567,9 @@ fn do_the_search(tables: Vec<[ScanWord; TABLE_SIZE]>, genome: Vec<u8>, start: us
         }
 
         i += 1;
-        if i > stop {
-            break;
-        }
     }
 
     matches
-}
-
-fn main() {
-    let f = File::open("/home/jakob/University/BIOL 296/dm6/dm6.fa").unwrap();
-    let (genome, exceptions, chromosomes) = read_fasta(&f).unwrap();
-    for chromosome in chromosomes {
-        println!("{:?}", chromosome);
-    }
-
-    let mut file = match File::create("/tmp/test.txt") {
-        Err(why) => panic!("couldn't create {}: {}", "/tmp/test.txt", why.description()),
-        Ok(file) => file,
-    };
-
-    match file.write_all(&genome) {
-        Err(why) => panic!("couldn't write to {}: {}", "/tmp/test.txt", why.description()),
-        Ok(_) => println!("successfully wrote to {}", "/tmp/test.txt"),
-    };
-
-    let mut file = match File::create("/tmp/exceptions.txt") {
-        Err(why) => panic!("couldn't create {}: {}", "/tmp/test.txt", why.description()),
-        Ok(file) => file,
-    };
-
-    for (position, word) in exceptions {
-        writeln!(file, "{} {:08x}", position, word);
-    }
 }
 
 #[cfg(test)]

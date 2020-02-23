@@ -401,7 +401,7 @@ fn recursive_enter(table: &mut [ScanWord; TABLE_SIZE], input: &str, mask: ScanWo
 /// # Arguments
 ///
 /// - `motifs` - the motifs being searched for.
-pub fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
+pub fn make_tables(motifs: &Vec<&str>) -> Vec<[ScanWord; TABLE_SIZE]> {
     let mut padded_motifs: Vec<String> = Vec::new();
 
     let max_length = motifs.iter().map(|motif| motif.len()).max().unwrap();
@@ -487,7 +487,7 @@ pub fn identify_matches(
     index: usize,
     depth: usize,
     genome: &Vec<u8>,
-    motifs: &Vec<String>,
+    motifs: &Vec<&str>,
 ) -> Vec<(String, usize)> {
     let mut matches = Vec::<(String, usize)>::new();
     let states_per_word = WORD_WIDTH / SCAN_WIDTH;
@@ -514,7 +514,7 @@ pub fn identify_matches(
                         });
                         if is_match {
                             // TODO: Check for "invalid characters".
-                            matches.push((motifs[k].clone(), position));
+                            matches.push((String::from(motifs[k]), position));
                         }
                     }
                 }

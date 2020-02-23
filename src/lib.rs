@@ -576,6 +576,35 @@ pub fn do_the_search(
     matches
 }
 
+pub fn get_matches_until(
+    motifs: &Vec<&str>,
+    genome: &Vec<u8>,
+    last_offset: usize,
+    n: usize,
+) -> Vec<(usize, String)> {
+    let chunk_sz = 4096;
+    let max_index = genome.len() - 1;
+    let tables = make_tables(motifs);
+    let mut offset = last_offset / SCAN_WIDTH;
+    let mut result = Vec::<(usize, String)>::new();
+
+    while offset < max_index {
+        let matches = search(&tables, genome, offset, offset + chunk_sz);
+        for (mask, position, depth) in matches {
+            let filtered = identify_matches(mask, position, depth, &genome, &motifs);
+            for (motif, position) in filtered {
+                result.push((position, String::from(motif)));
+                if result.len() == n {
+                    return result;
+                }
+            }
+        }
+        offset += chunk_sz;
+    }
+
+    return result;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,9 +3,9 @@ name = "mermer-rs"
 description = "Implementation of the Stack-AND exact string matching algorithm."
 repository = "https://github.com/Markstein-Lab/mermer-rs"
 keywords = ["bioinformatics"]
-license = "GPL-3.0-or-later"
+license = "AGPL-3.0-or-later"
 version = "0.1.0"
-authors = ["Jakob L. Kreuze <zerodaysfordays@sdf.lonestar.org>"]
+authors = ["Jakob L. Kreuze <zerodaysfordays@sdf.org>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

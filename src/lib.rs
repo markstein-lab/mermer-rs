@@ -30,10 +30,10 @@
 // data that would be contained in genome.txt, exceptions.txt, and xcontigs.txt
 // are all returned as their respective in-memory structures.
 
+use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::fs::File;
 
 /// The size of the sliding window and corresponding "turbo factor", denoting
 /// the number of nucleotides that constitute a "genome chunk".
@@ -68,7 +68,7 @@ impl ParseBuffer {
     /// Return a new, empty ParseBuffer.
     fn new() -> Self {
         ParseBuffer {
-            nibble : 0,
+            nibble: 0,
             nibble_size: 0,
             exception: 0,
             exception_size: 0,
@@ -281,7 +281,7 @@ fn substitute_char(s: &str, offset: usize, substitution: char) -> String {
     let mut res = String::with_capacity(s.len());
     res.push_str(&s[0..offset]);
     res.push(substitution);
-    res.push_str(&s[offset+1..]);
+    res.push_str(&s[offset + 1..]);
     res
 }
 
@@ -369,8 +369,7 @@ fn recursive_enter(table: &mut [ScanWord; TABLE_SIZE], input: &str, mask: ScanWo
                 recursive_enter(table, &substitute_char(input, i, 'T'), mask);
                 return;
             }
-            _ => {
-            }
+            _ => {}
         }
     }
 
@@ -405,11 +404,7 @@ fn recursive_enter(table: &mut [ScanWord; TABLE_SIZE], input: &str, mask: ScanWo
 pub fn make_tables(motifs: &Vec<String>) -> Vec<[ScanWord; TABLE_SIZE]> {
     let mut padded_motifs: Vec<String> = Vec::new();
 
-    let max_length = motifs
-        .iter()
-        .map(|motif| motif.len())
-        .max()
-        .unwrap();
+    let max_length = motifs.iter().map(|motif| motif.len()).max().unwrap();
     let extended_motif_length = max_length + (SCAN_WIDTH - 1);
     let number_of_tables = (extended_motif_length + (SCAN_WIDTH - 1)) / SCAN_WIDTH;
     let padded_length = (number_of_tables + 1) * SCAN_WIDTH;
@@ -487,7 +482,13 @@ fn dna_char(genome: &Vec<u8>, position: usize) -> char {
     ['A', 'C', 'G', 'T'][index as usize]
 }
 
-pub fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: &Vec<u8>, motifs: &Vec<String>) -> Vec::<(String, usize)> {
+pub fn identify_matches(
+    mask: ScanWord,
+    index: usize,
+    depth: usize,
+    genome: &Vec<u8>,
+    motifs: &Vec<String>,
+) -> Vec<(String, usize)> {
     let mut matches = Vec::<(String, usize)>::new();
     let states_per_word = WORD_WIDTH / SCAN_WIDTH;
     let maximum_index = if motifs.len() < states_per_word {
@@ -508,11 +509,9 @@ pub fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: &Vec
                 if mask & bit != 0 {
                     let position = (index - depth + 1) * SCAN_WIDTH + j;
                     for k in (i..motifs.len()).step_by(states_per_word) {
-                        let is_match = motifs[k].chars()
-                            .enumerate()
-                            .all(|(m, nucleotide)| {
-                                is_symbol(nucleotide, dna_char(&genome, position + m))
-                            });
+                        let is_match = motifs[k].chars().enumerate().all(|(m, nucleotide)| {
+                            is_symbol(nucleotide, dna_char(&genome, position + m))
+                        });
                         if is_match {
                             // TODO: Check for "invalid characters".
                             matches.push((motifs[k].clone(), position));
@@ -529,7 +528,12 @@ pub fn identify_matches(mask: ScanWord, index: usize, depth: usize, genome: &Vec
 }
 
 // TODO: Give a better name than the original function.
-pub fn do_the_search(tables: &Vec<[ScanWord; TABLE_SIZE]>, genome: &Vec<u8>, start: usize, stop: usize) -> Vec<(ScanWord, usize, usize)> {
+pub fn do_the_search(
+    tables: &Vec<[ScanWord; TABLE_SIZE]>,
+    genome: &Vec<u8>,
+    start: usize,
+    stop: usize,
+) -> Vec<(ScanWord, usize, usize)> {
     let mut depth = 0;
     let mut i = start;
     let mut masks: Vec<ScanWord> = vec![0; tables.len()];
@@ -557,7 +561,7 @@ pub fn do_the_search(tables: &Vec<[ScanWord; TABLE_SIZE]>, genome: &Vec<u8>, sta
                     while {
                         depth -= 1;
                         depth > 0 && masks[depth - 1] == 0
-                    } {};
+                    } {}
                 } else {
                     depth += 1;
                 }
